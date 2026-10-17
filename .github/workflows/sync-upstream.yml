@@ -1,0 +1,50 @@
+name: Upstream Sync & Auto Deploy
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # 每 6 小时自动检测上游并同步
+  workflow_dispatch:       # 支持在 GitHub 页面手动一键触发同步
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync from akudamatata/Solara
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure Git Identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync with Upstream
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Attempting sync with upstream akudamatata/Solara..."
+          if gh repo sync ${{ github.repository }} --source akudamatata/Solara --branch main; then
+            echo "Upstream sync completed successfully via GitHub CLI."
+          else
+            echo "Fast-forward not possible, merging via git..."
+            git remote add upstream https://github.com/akudamatata/Solara.git || true
+            git fetch upstream main
+            git checkout main
+            git merge upstream/main --no-edit -m "chore: auto-sync latest updates from upstream akudamatata/Solara"
+            git push origin main
+          fi
+
+      - name: Deploy to Cloudflare Pages (if CF secrets provided)
+        if: env.HAS_CF_TOKEN == 'true'
+        env:
+          HAS_CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler pages deploy . --project-name=solara-music --branch=main
