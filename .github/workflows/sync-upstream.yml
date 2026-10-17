@@ -10,8 +10,12 @@ permissions:
 
 jobs:
   sync:
-    name: Sync from akudamatata/Solara
+    name: Sync from akudamatata/Solara & Deploy to CF Pages
     runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,11 +44,13 @@ jobs:
             git push origin main
           fi
 
-      - name: Deploy to Cloudflare Pages (if CF secrets provided)
-        if: env.HAS_CF_TOKEN == 'true'
-        env:
-          HAS_CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Deploy to Cloudflare Pages
+        if: env.CLOUDFLARE_API_TOKEN != ''
         run: |
-          npx wrangler pages deploy . --project-name=solara-music --branch=main
+          echo "Deploying to Cloudflare Pages project solara-music..."
+          npx wrangler pages deploy . --project-name=solara-music --branch=main --commit-dirty=true
