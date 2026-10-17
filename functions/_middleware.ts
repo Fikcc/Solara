@@ -32,6 +32,19 @@ function isPublicPath(pathname: string): boolean {
   );
 }
 
+// 拦截并关闭原生的 *.pages.dev 域名访问
+async function disablePagesDevMiddleware(context: any) {
+  const { request } = context;
+  const url = new URL(request.url);
+  if (url.hostname.endsWith(".pages.dev")) {
+    return new Response("Access Denied: Direct access via *.pages.dev is disabled. Please visit https://music.tank220a.dpdns.org", {
+      status: 403,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+  return context.next();
+}
+
 async function authMiddleware(context: any) {
   const { request, env } = context;
   const password = env.PASSWORD;
@@ -97,4 +110,4 @@ async function i18nMiddleware(context: any) {
   return response;
 }
 
-export const onRequest = [authMiddleware, i18nMiddleware];
+export const onRequest = [disablePagesDevMiddleware, authMiddleware, i18nMiddleware];
